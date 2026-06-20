@@ -30,10 +30,10 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 from .graph import StateGraph, CompiledGraph, _serializable_state, _format_execution_history
 from .persistence import CheckpointStore
 from .model_router import ModelRouter
-from agents.orchestrator_agent import OrchestratorAgent
-from agents.team_agent import TeamAgent
-from agents.judge_agent import JudgeAgent
-from agents.base import AgentContext
+from gaal_v3.agents.orchestrator_agent import OrchestratorAgent
+from gaal_v3.agents.team_agent import TeamAgent
+from gaal_v3.agents.judge_agent import JudgeAgent
+from gaal_v3.agents.base import AgentContext
 
 logger = logging.getLogger(__name__)
 

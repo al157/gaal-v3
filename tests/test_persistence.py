@@ -20,13 +20,13 @@ import tempfile
 import threading
 from pathlib import Path
 
-# Ensure the package root is on sys.path
+# Ensure the package root is on sys.path (development fallback)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 from typing import Dict, Any, List
 
-from core.persistence import CheckpointStore
+from gaal_v3.core.persistence import CheckpointStore
 
 
 # ── Fixtures ───────────────────────────────────────────────────────

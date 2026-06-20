@@ -11,13 +11,13 @@ import os
 import json
 from pathlib import Path
 
-# Ensure the package root is on sys.path
+# Ensure the package root is on sys.path (development fallback)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 from typing import Any, Dict, List
 
-from agents.judge_agent import (
+from gaal_v3.agents.judge_agent import (
     JudgeAgent,
     _score_dimension,
     _desc_quality_score,
@@ -25,14 +25,14 @@ from agents.judge_agent import (
     _count_aspects,
     DIMENSION_SCORERS,
 )
-from agents.team_agent import TeamAgent, _analyze_goal
-from agents.orchestrator_agent import (
+from gaal_v3.agents.team_agent import TeamAgent, _analyze_goal
+from gaal_v3.agents.orchestrator_agent import (
     OrchestratorAgent,
     _detect_mode,
     _parse_requirements,
     _count_tech_domain_terms,
 )
-from agents.base import AgentContext
+from gaal_v3.agents.base import AgentContext
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -385,7 +385,7 @@ class TestBootstrapSelfEvolution:
 
     def test_compute_bootstrap_score(self):
         """compute_bootstrap_score should return a valid score."""
-        from core.orchestrator import compute_bootstrap_score
+        from gaal_v3.core.orchestrator import compute_bootstrap_score
 
         # Good state
         state_good = {
@@ -415,7 +415,7 @@ class TestBootstrapSelfEvolution:
 
     def test_suggest_evolution_action_increasing_loops(self):
         """Should suggest increasing max_loops when score declines."""
-        from core.orchestrator import suggest_evolution_action
+        from gaal_v3.core.orchestrator import suggest_evolution_action
 
         state = {
             "scored_proposals": [],
@@ -429,7 +429,7 @@ class TestBootstrapSelfEvolution:
 
     def test_suggest_evolution_action_adjust_weight(self):
         """Should suggest adjusting weight when a dimension is weak."""
-        from core.orchestrator import suggest_evolution_action
+        from gaal_v3.core.orchestrator import suggest_evolution_action
 
         state = {
             "scored_proposals": [{
@@ -456,7 +456,7 @@ class TestBootstrapSelfEvolution:
 
     def test_apply_evolution_action_increase_loops(self):
         """Applying increase_loops should modify the config."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={"gaal": {"max_loops": 4}})
         action = {
@@ -471,7 +471,7 @@ class TestBootstrapSelfEvolution:
 
     def test_apply_evolution_action_enable_evolution(self):
         """Applying enable_evolution should enable evolution in config."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={"evolution": {"enabled": False}})
         action = {
@@ -486,7 +486,7 @@ class TestBootstrapSelfEvolution:
 
     def test_save_evolution_artifact(self):
         """Evolution artifacts should be saved to evolution/ directory."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
         import os
 
         orc = GAALOrchestrator(config={})
@@ -501,7 +501,7 @@ class TestBootstrapSelfEvolution:
 
     def test_evolve_config_method(self):
         """evolve_config() should return an action result."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={
             "gaal": {"max_loops": 4},
@@ -524,14 +524,14 @@ class TestGracefulDegradation:
 
     def test_degradation_level_in_state(self):
         """degradation_level should be in graph state."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
         assert orc.degradation_level == 0
 
     def test_degradation_super_to_hard(self):
         """Super mode should degrade to hard."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
         orc.mode = "super"
@@ -544,7 +544,7 @@ class TestGracefulDegradation:
 
     def test_degradation_hard_to_lite(self):
         """Hard mode should degrade to lite."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
         orc.mode = "hard"
@@ -557,7 +557,7 @@ class TestGracefulDegradation:
 
     def test_fallback_proposal_generation(self):
         """Fallback proposals should be generated on timeout."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
         proposals = orc._generate_fallback_proposal("test goal", "TeamAlpha", "team_a")
@@ -571,7 +571,7 @@ class TestCostTracking:
 
     def test_track_node_cost(self):
         """Tracking cost for a node should accumulate data."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
         orc._track_node_cost("test_node", "testing", 1000, 3)
@@ -583,7 +583,7 @@ class TestCostTracking:
 
     def test_cost_summary_structure(self):
         """Cost summary should have the expected structure."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
         orc._track_node_cost("propose_team_a", "team_a_proposal", 500, 1)
@@ -602,7 +602,7 @@ class TestCostTracking:
 
     def test_budget_enforcement(self):
         """Budget exceeded flag should be set when over limit."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
         orc._max_total_tokens = 100  # Very low budget
@@ -612,7 +612,7 @@ class TestCostTracking:
 
     def test_per_team_cost_tracking(self):
         """Cost should be tracked per team correctly."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
 
@@ -629,7 +629,7 @@ class TestPerformanceStats:
 
     def test_build_performance_stats(self):
         """Performance stats should be computed from execution history."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
         orc.execution_history = [
@@ -651,7 +651,7 @@ class TestParallelTeamExecution:
 
     def test_parallel_team_execution_both_return(self):
         """Both teams should return proposals when executed in parallel."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={
             "teams": {
@@ -676,7 +676,7 @@ class TestParallelTeamExecution:
 
     def test_fallback_on_timeout(self):
         """Fallback proposals should be generated if team fails."""
-        from core.orchestrator import GAALOrchestrator
+        from gaal_v3.core.orchestrator import GAALOrchestrator
 
         orc = GAALOrchestrator(config={})
         fallback = orc._generate_fallback_proposal("test", "TeamAlpha", "team_a")
@@ -689,7 +689,7 @@ class TestCircuitBreakerPersistence:
 
     def test_circuit_breaker_serialize_deserialize(self):
         """Circuit breaker state should be serializable and restorable."""
-        from core.orchestrator import CircuitBreaker
+        from gaal_v3.core.orchestrator import CircuitBreaker
 
         cb = CircuitBreaker(threshold=3, reset_seconds=60)
         cb.record_failure()
@@ -707,7 +707,7 @@ class TestCircuitBreakerPersistence:
 
     def test_circuit_breaker_opens_at_threshold(self):
         """Circuit breaker should open at threshold."""
-        from core.orchestrator import CircuitBreaker
+        from gaal_v3.core.orchestrator import CircuitBreaker
 
         cb = CircuitBreaker(threshold=3, reset_seconds=60)
         cb.record_failure()

@@ -1,5 +1,5 @@
 """
-GAAL v3 Core — LangGraph-inspired StateGraph Arena Framework.
+GAAL v3 — LangGraph-inspired StateGraph Arena Framework.
 
 GAAL (Goal-oriented Autonomous Arena Loop) v3 is a complete redesign
 using LangGraph-inspired architecture with nodes+edges, proper checkpointing,

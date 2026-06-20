@@ -2,11 +2,11 @@
 import sys, os, json, yaml
 from pathlib import Path
 
-# Ensure project root is on sys.path for absolute imports
-ROOT = Path(__file__).parent
-sys.path.insert(0, str(ROOT))
+# GAAL v3 project root (gaal_v3/ is a subdirectory)
+ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = os.environ.get("GAAL_V3_ROOT", str(ROOT))
 
-from core.orchestrator import GAALOrchestrator
+from gaal_v3.core.orchestrator import GAALOrchestrator
 
 
 def run_arena(goal: str, mode: str = "lite", max_loops: int = 4,
@@ -19,7 +19,7 @@ def run_arena(goal: str, mode: str = "lite", max_loops: int = 4,
         max_loops: Max arena loops.
         config_path: Path to config YAML (default: config/gaal_v3.yaml).
     """
-    config_path = config_path or str(ROOT / "config" / "gaal_v3.yaml")
+    config_path = config_path or os.path.join(PROJECT_ROOT, "config", "gaal_v3.yaml")
 
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
@@ -76,3 +76,38 @@ if __name__ == "__main__":
         print(f"Level: {deg_level}")
 
     print(f"\nSession: {result.get('session_id', 'N/A')}")
+
+
+def main():
+    """Console-script entry point for 'gaal-arena' command.
+
+    Parses argv and runs the arena, printing structured output.
+    """
+    import sys
+    goal = sys.argv[1] if len(sys.argv) > 1 else "设计一个简单的文件备份系统"
+    mode = sys.argv[2] if len(sys.argv) > 2 else "lite"
+    max_loops = int(sys.argv[3]) if len(sys.argv) > 3 else 4
+
+    print(f"GAAL v3 Arena — Mode: {mode}")
+    print(f"Goal: {goal}")
+    print("=" * 60)
+
+    result = run_arena(goal=goal, mode=mode, max_loops=max_loops)
+
+    hist = result.get("execution_history", [])
+    state = result.get("final_state", {})
+
+    print(f"\nStatus: {result.get('status', '?')}")
+    print(f"Nodes executed: {len(hist)}")
+    for h in hist:
+        print(f"  [{h['status']:>9}] {h['node']:<16} ({h['duration']:.4f}s)")
+    print(f"\nScore: {state.get('total_score', 'N/A')} / 10")
+    print(f"Passed: {state.get('total_score', 0) >= state.get('pass_threshold', 8.5)}")
+    print(f"Loops: {state.get('current_loop', 0)} / {state.get('max_loops', 4)}")
+    print(f"Proposals: {len(state.get('proposals', []))}")
+    print(f"Winner: {state.get('winner_name', 'N/A')}")
+    sys.exit(0 if state.get('total_score', 0) >= state.get('pass_threshold', 8.5) else 1)
+
+
+if __name__ == "__main__":
+    main()

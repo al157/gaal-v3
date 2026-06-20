@@ -3,7 +3,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gaal-v3"
+name = "gaal_v3"
 version = "3.0.0"
 description = "GAAL v3 — LangGraph-inspired StateGraph Arena Framework"
 requires-python = ">=3.11"
@@ -11,6 +11,9 @@ dependencies = [
     "jinja2>=3.0",
     "pyyaml>=6.0",
 ]
+
+[project.scripts]
+gaal-arena = "gaal_v3.run:main"
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]
