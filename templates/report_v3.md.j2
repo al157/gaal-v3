@@ -1,0 +1,80 @@
+# GAAL v3 竞技场报告 — Arena Report
+
+[T] 任务概览 — Task Overview
+- **目标 / Goal**: {{ goal }}
+- **模式 / Mode**: {{ mode }}
+- **轮次 / Loops**: {{ loop_count }}
+- **完成时间 / Completed**: {{ completion_time }}
+- **总评分 / Total Score**: {{ total_score }}/10
+- **会话 ID / Session**: {{ session_id }}
+
+---
+
+[M] 全部提案记录 — All Proposals ({{ proposals|length }} total)
+
+{% for team, team_proposals in proposals|groupby('team') %}
+**{{ team }} 提案 / {{ team }} Proposals:**
+{% for p in team_proposals %}
+{{ loop.index }}. **{{ p.name }}** — {{ p.description }}
+{%- if p.score is defined %} \[Score: {{ p.score }}/10\]{% endif %}
+{% endfor %}
+{% endfor %}
+
+---
+
+[V] 淘汰记录 — Elimination History
+
+| 轮次 Round | 方案 Proposal | 原因 Reason |
+|:----------:|:-------------|:------------|
+{% for elimination in eliminations %}
+| {{ elimination.round }} | {{ elimination.name }} | {{ elimination.reason }} |
+{% endfor %}
+
+---
+
+[I] 最终方案 — Final Deliverable
+
+### 系统架构 / Architecture
+```
+{{ architecture_diagram }}
+```
+
+### 组件清单 / Component List
+| 组件 Component | 职责 Role | 实现 Implementation |
+|:--------------|:----------|:-------------------|
+{% for component in components %}
+| {{ component.name }} | {{ component.role }} | {{ component.implementation }} |
+{% endfor %}
+
+---
+
+[A] 交付标准达成 — Achievement Score
+
+| 维度 Dimension | 得分 Score (0-2) | 说明 Note |
+|:--------------|:-----------------|:----------|
+{% for dim in dimensions %}
+| {{ dim.name }} | {{ dim.score }}/2 | {{ dim.note }} |
+{% endfor %}
+| **总分 Total** | **{{ total_score }}/10** | |
+
+---
+
+[W] 实施建议 — Next Steps
+
+{% for phase, items in suggestions.items() %}
+**{{ phase }}:**
+{% for item in items %}
+- {{ item }}
+{% endfor %}
+{% endfor %}
+
+{% if historical_trend %}
+---
+
+[H] 历史趋势 — Trend Analysis
+| 轮次 Round | 淘汰数 Eliminated | 被淘汰方案 |
+|:----------:|:-----------------:|:-----------|
+{% for trend in historical_trend %}
+| {{ trend.round }} | {{ trend.eliminated_count }} | {{ trend.eliminated }} |
+{% endfor %}
+{% endif %}

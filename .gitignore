@@ -1,0 +1,14 @@
+# State files — gitignored
+state/
+*.db
+*.db-wal
+*.db-shm
+evolution/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/

@@ -1,0 +1,65 @@
+# GAAL v3 配置 — Hard 模式
+# GAAL v3 Configuration — Hard Mode
+gaal:
+  version: 3
+  goal: ""
+  mode: hard
+  max_loops: 10
+  max_proposals_per_team: 10
+  timeout_minutes: 180
+
+teams:
+  count: 2
+  team_a:
+    name: "Team Alpha"
+    model: deepseek-v4-pro
+    provider: custom:inferaichat
+    tier: pro
+    role: "主攻方案 — 高质量、深度推理"
+  team_b:
+    name: "Team Beta"
+    model: deepseek-v4-flash
+    provider: custom:inferaichat
+    tier: flash
+    role: "辅攻方案 — 快速、多样化"
+
+judge:
+  pass_threshold: 8.5
+  model: deepseek-v4-pro
+  dimensions:
+    - name: generality
+      weight: 2
+      description: "通用性 — 换目标仅改 goal 字段"
+    - name: zero_leak
+      weight: 2
+      description: "零泄露 — 框架级隔离"
+    - name: reliability
+      weight: 2
+      description: "可靠性 — 崩溃恢复/无人值守"
+    - name: delivery_quality
+      weight: 2
+      description: "交付质量 — 结构化报告/可追溯"
+    - name: bootstrap
+      weight: 2
+      description: "自举能力 — 可改进自身"
+
+checkpoint:
+  enabled: true
+  db_path: "state/gaal_v3_checkpoints.db"
+  auto_recover: true
+
+circuit_breaker:
+  threshold: 5
+  reset_seconds: 300
+
+retry:
+  max_attempts: 3
+  base_delay_seconds: 5
+  max_delay_seconds: 120
+
+evolution:
+  enabled: false
+  max_iterations: 3
+  config_paths:
+    - "config/gaal_v3_hard.yaml"
+    - "config/scorecard.yaml"

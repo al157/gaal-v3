@@ -1,0 +1,57 @@
+# GAAL v3 Scorecard — 评分维度与权重
+# GAAL v3 Scoring Dimensions and Weights
+# Each dimension: 0-2 points (0=none, 0.5=partial, 1=adequate, 1.5=good, 2=excellent)
+scorecard:
+  dimensions:
+    generality:
+      weight: 2
+      description: "通用性 — 换目标仅改 goal 字段"
+      criteria:
+        - "配置驱动，无需改 prompt 代码"
+        - "目标字段与逻辑完全解耦"
+        - "支持不同类型的输入目标"
+
+    zero_leak:
+      weight: 2
+      description: "零泄露 — 框架级隔离"
+      criteria:
+        - "所有工具输出在 delegate_task 沙箱内"
+        - "主会话只收干净摘要"
+        - "不可绕过隔离层"
+
+    reliability:
+      weight: 2
+      description: "可靠性 — 崩溃恢复/无人值守"
+      criteria:
+        - "状态持久化到 SQLite 检查点"
+        - "崩溃后可重放恢复"
+        - "超时/断连自动重试"
+        - "无外部依赖服务"
+
+    delivery_quality:
+      weight: 2
+      description: "交付质量 — 结构化报告/可追溯"
+      criteria:
+        - "报告使用模板引擎"
+        - "淘汰记录完整可追溯"
+        - "评分过程透明"
+
+    bootstrap:
+      weight: 2
+      description: "自举能力 — 可改进自身"
+      criteria:
+        - "配置可被 GAAL 流程读取修改"
+        - "评分卡可自优化"
+        - "架构可自演化"
+
+  thresholds:
+    pass: 8.5
+    excellent: 9.0
+    min_improvement_per_loop: 2
+
+  # Self-evolution override weights
+  evolution:
+    enabled: false
+    learning_rate: 0.1
+    max_adjustment: 0.5
+    track_history: true

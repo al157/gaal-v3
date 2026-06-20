@@ -1,0 +1,74 @@
+# GAAL v3 配置 — Super 模式（含全网调研）
+# GAAL v3 Configuration — Super Mode (with Full Research)
+gaal:
+  version: 3
+  goal: ""
+  mode: super
+  max_loops: 20
+  max_proposals_per_team: 10
+  timeout_minutes: 360
+
+teams:
+  count: 2
+  team_a:
+    name: "Team Alpha"
+    model: deepseek-v4-pro
+    provider: custom:inferaichat
+    tier: ultra
+    role: "主攻方案 — 顶级推理、深度创新"
+  team_b:
+    name: "Team Beta"
+    model: deepseek-v4-flash
+    provider: custom:inferaichat
+    tier: pro
+    role: "辅攻方案 — 高质量快速迭代"
+
+judge:
+  pass_threshold: 9.0
+  model: deepseek-v4-pro
+  dimensions:
+    - name: research_depth
+      weight: 2
+      description: "调研深度 — 使用 agent-reach 进行全网调研"
+    - name: proposal_quality
+      weight: 2
+      description: "方案质量 — 完整性和可行性"
+    - name: innovation
+      weight: 2
+      description: "创新性 — 差异化方案设计"
+    - name: feasibility
+      weight: 2
+      description: "可行性 — 技术可实现性"
+    - name: delivery_quality
+      weight: 2
+      description: "交付质量 — 结构化报告/可追溯"
+
+research:
+  enabled: true
+  depth: full
+  platforms:
+    - web_search
+    - github
+    - social
+  min_sources_per_proposal: 3
+
+checkpoint:
+  enabled: true
+  db_path: "state/gaal_v3_checkpoints.db"
+  auto_recover: true
+
+circuit_breaker:
+  threshold: 5
+  reset_seconds: 300
+
+retry:
+  max_attempts: 3
+  base_delay_seconds: 5
+  max_delay_seconds: 120
+
+evolution:
+  enabled: false
+  max_iterations: 3
+  config_paths:
+    - "config/gaal_v3_super.yaml"
+    - "config/scorecard.yaml"
