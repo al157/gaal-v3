@@ -7,6 +7,12 @@
 - **完成时间 / Completed**: {{ completion_time }}
 - **总评分 / Total Score**: {{ total_score }}/10
 - **会话 ID / Session**: {{ session_id }}
+{% if bootstrap_score %}
+- **自举评分 / Bootstrap Score**: {{ bootstrap_score }}/10
+{% endif %}
+{% if degradation_level > 0 %}
+- **降级等级 / Degradation Level**: {{ degradation_level }} (0=full, 1=downgraded, 2=fallback)
+{% endif %}
 
 ---
 
@@ -15,10 +21,24 @@
 {% for team, team_proposals in proposals|groupby('team') %}
 **{{ team }} 提案 / {{ team }} Proposals:**
 {% for p in team_proposals %}
-{{ loop.index }}. **{{ p.name }}** — {{ p.description }}
+{{ loop.index }}. **{{ p.name }}** — {{ p.description[:100] }}...
 {%- if p.score is defined %} \[Score: {{ p.score }}/10\]{% endif %}
+{%- if p.total_score is defined %} \[Score: {{ p.total_score }}/10\]{% endif %}
 {% endfor %}
 {% endfor %}
+
+{% if dimensions %}
+---
+
+[A] 交付标准达成 — Achievement Score (LLM-Style)
+
+| 维度 Dimension | 得分 Score (0-2) | 权重 Weight | 评分理由 Justification |
+|:--------------|:----------------:|:-----------:|:----------------------|
+{% for dim in dimensions %}
+| {{ dim.name }} | {{ dim.score }}/2 | {{ dim.weight }} | {{ dim.justification or dim.note or '-' }} |
+{% endfor %}
+| **总分 Total** | **{{ total_score }}/10** | | |
+{% endif %}
 
 ---
 
@@ -28,7 +48,20 @@
 |:----------:|:-------------|:------------|
 {% for elimination in eliminations %}
 | {{ elimination.round }} | {{ elimination.name }} | {{ elimination.reason }} |
+{% else %}
+| - | (无淘汰) | - |
 {% endfor %}
+
+{% if historical_trend %}
+---
+
+[H] 历史趋势 — Trend Analysis
+| 轮次 Round | 淘汰数 Eliminated | 被淘汰方案 |
+|:----------:|:-----------------:|:-----------|
+{% for trend in historical_trend %}
+| {{ trend.round }} | {{ trend.eliminated_count }} | {{ trend.eliminated }} |
+{% endfor %}
+{% endif %}
 
 ---
 
@@ -48,17 +81,6 @@
 
 ---
 
-[A] 交付标准达成 — Achievement Score
-
-| 维度 Dimension | 得分 Score (0-2) | 说明 Note |
-|:--------------|:-----------------|:----------|
-{% for dim in dimensions %}
-| {{ dim.name }} | {{ dim.score }}/2 | {{ dim.note }} |
-{% endfor %}
-| **总分 Total** | **{{ total_score }}/10** | |
-
----
-
 [W] 实施建议 — Next Steps
 
 {% for phase, items in suggestions.items() %}
@@ -68,13 +90,72 @@
 {% endfor %}
 {% endfor %}
 
-{% if historical_trend %}
+{% if performance_stats %}
 ---
 
-[H] 历史趋势 — Trend Analysis
-| 轮次 Round | 淘汰数 Eliminated | 被淘汰方案 |
-|:----------:|:-----------------:|:-----------|
-{% for trend in historical_trend %}
-| {{ trend.round }} | {{ trend.eliminated_count }} | {{ trend.eliminated }} |
+[P] 性能统计 — Performance Stats
+
+| 指标 Metric | 值 Value |
+|:-----------|:---------|
+| 总节点数 / Total Nodes | {{ performance_stats.total_nodes }} |
+| 总耗时 / Total Duration | {{ performance_stats.total_duration }}s |
+| 总尝试数 / Total Attempts | {{ performance_stats.total_attempts }} |
+| 重试次数 / Retries | {{ performance_stats.retries }} |
+| 平均节点耗时 / Avg Duration/Node | {{ performance_stats.avg_duration_per_node }}s |
+
+**节点详情 / Node Details:**
+| 节点 Node | 调用数 Calls | 总耗时 Duration | 总尝试 Attempts |
+|:---------|:-----------:|:---------------:|:---------------:|
+{% for node, stats in (performance_stats.node_stats or {}).items() %}
+| {{ node }} | {{ stats.calls }} | {{ "%.3f"|format(stats.total_duration) }}s | {{ stats.total_attempts }} |
+{% endfor %}
+{% endif %}
+
+{% if cost_summary %}
+---
+
+[C] 成本摘要 — Cost Summary
+
+| 指标 Metric | 值 Value |
+|:-----------|:---------|
+| 总调用数 / Total Calls | {{ cost_summary.total_calls or 0 }} |
+| 总 Token 数 / Total Tokens | {{ cost_summary.total_tokens or 0 }} |
+| 总成本 / Total Cost | {{ cost_summary.total_cost }}$ |
+| 预算超限 / Budget Exceeded | {{ cost_summary.budget_exceeded or 'No' }} |
+
+**各团队成本 / Per-Team:**
+- Team A: {{ cost_summary.per_team.team_a if cost_summary.per_team else 0 }}$
+- Team B: {{ cost_summary.per_team.team_b if cost_summary.per_team else 0 }}$
+
+**各节点成本 / Per-Node:**
+| 节点 Node | 调用数 Calls | 总 Tokens | 总成本 Cost |
+|:---------|:-----------:|:---------:|:----------:|
+{% for node, data in (cost_summary.per_node or {}).items() %}
+| {{ node }} | {{ data.calls }} | {{ data.total_tokens }} | {{ "%.2f"|format(data.total_cost) }}$ |
+{% endfor %}
+{% endif %}
+
+{% if degradation_history %}
+---
+
+[D] 降级历史 — Degradation History
+| 轮次 | 等级 | 说明 |
+|:---:|:----:|:----|
+{% for deg in degradation_history %}
+| {{ deg.round }} | {{ deg.level }} | {{ deg.note }} |
+{% endfor %}
+{% endif %}
+
+{% if evolution_suggestions %}
+---
+
+[E] 自进化记录 — Evolution Suggestions
+
+{% for evo in evolution_suggestions %}
+**Cycle {{ loop.index }}:** {{ evo.action }} on `{{ evo.target }}`
+- Reason: {{ evo.reason }}
+- Status: {{ evo.status }}
+{%- if evo.old_weight %} (weight: {{ evo.old_weight }} → {{ evo.new_weight }}){% endif %}
+{%- if evo.old_max_loops %} (max_loops: {{ evo.old_max_loops }} → {{ evo.new_max_loops }}){% endif %}
 {% endfor %}
 {% endif %}

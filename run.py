@@ -12,7 +12,7 @@ from core.orchestrator import GAALOrchestrator
 def run_arena(goal: str, mode: str = "lite", max_loops: int = 4,
               config_path: str = None):
     """Run a GAAL v3 arena with the given goal.
-    
+
     Args:
         goal: The goal/task to run.
         mode: Arena mode ('lite', 'hard', 'super').
@@ -20,14 +20,14 @@ def run_arena(goal: str, mode: str = "lite", max_loops: int = 4,
         config_path: Path to config YAML (default: config/gaal_v3.yaml).
     """
     config_path = config_path or str(ROOT / "config" / "gaal_v3.yaml")
-    
+
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
-    
+
     cfg["gaal"]["goal"] = goal
     cfg["gaal"]["mode"] = mode
     cfg["gaal"]["max_loops"] = max_loops
-    
+
     orc = GAALOrchestrator(config=cfg)
     result = orc.run(goal=goal)
     return result
@@ -36,16 +36,16 @@ def run_arena(goal: str, mode: str = "lite", max_loops: int = 4,
 if __name__ == "__main__":
     goal = sys.argv[1] if len(sys.argv) > 1 else "设计一个简单的文件备份系统"
     mode = sys.argv[2] if len(sys.argv) > 2 else "lite"
-    
+
     print(f"GAAL v3 Arena — Mode: {mode}")
     print(f"Goal: {goal}")
     print("=" * 60)
-    
+
     result = run_arena(goal=goal, mode=mode)
-    
+
     hist = result.get("execution_history", [])
     state = result.get("final_state", {})
-    
+
     print(f"\nStatus: {result.get('status', '?')}")
     print(f"Nodes executed: {len(hist)}")
     for h in hist:
@@ -55,3 +55,24 @@ if __name__ == "__main__":
     print(f"Loops: {state.get('current_loop', 0)} / {state.get('max_loops', 4)}")
     print(f"Proposals: {len(state.get('proposals', []))}")
     print(f"Winner: {state.get('winner_name', 'N/A')}")
+
+    # Enhanced output
+    perf = state.get('performance_stats', {})
+    if perf:
+        print(f"\n--- Performance Stats ---")
+        print(f"Total Duration: {perf.get('total_duration', 0):.3f}s")
+        print(f"Retries: {perf.get('retries', 0)}")
+        print(f"Avg Duration/Node: {perf.get('avg_duration_per_node', 0):.3f}s")
+
+    cost = result.get('report_data', {}).get('cost_summary', {})
+    if cost:
+        print(f"\n--- Cost Summary ---")
+        print(f"Total Tokens: {cost.get('total_tokens', 0)}")
+        print(f"Total Cost: ${cost.get('total_cost', 0):.2f}")
+
+    deg_level = state.get('degradation_level', 0)
+    if deg_level > 0:
+        print(f"\n--- Degradation ---")
+        print(f"Level: {deg_level}")
+
+    print(f"\nSession: {result.get('session_id', 'N/A')}")

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 MODEL_TIERS: Dict[str, Dict[str, Any]] = {
     "flash": {
-        "cost": 1,
+        "cost_per_1k": 0.15,
         "capability": "basic",
         "description": "轻量模型 — 简单任务、快速响应",
         "models": [
@@ -34,7 +34,7 @@ MODEL_TIERS: Dict[str, Dict[str, Any]] = {
         ],
     },
     "pro": {
-        "cost": 3,
+        "cost_per_1k": 0.50,
         "capability": "advanced",
         "description": "专业模型 — 中等复杂度、深度推理",
         "models": [
@@ -45,7 +45,7 @@ MODEL_TIERS: Dict[str, Dict[str, Any]] = {
         ],
     },
     "ultra": {
-        "cost": 5,
+        "cost_per_1k": 1.50,
         "capability": "expert",
         "description": "顶级模型 — 复杂推理、全网调研",
         "models": [
@@ -125,6 +125,8 @@ class CostTracker:
         model: str,
         cost_multiplier: float,
         tokens: int = 1000,
+        operation: str = "",
+        node_name: str = "",
     ) -> None:
         """Record an estimated cost for a model call.
 
@@ -132,20 +134,27 @@ class CostTracker:
             model: Model name.
             cost_multiplier: Relative cost multiplier (1=flash, 3=pro, 5=ultra).
             tokens: Estimated token count.
+            operation: Type of operation (e.g., 'goal_parsing', 'team_a_proposal').
+            node_name: Graph node name.
         """
         self._calls.append({
             "model": model,
             "cost_multiplier": cost_multiplier,
             "estimated_tokens": tokens,
+            "operation": operation,
+            "node_name": node_name,
+            "cost": cost_multiplier * (tokens / 1000.0),
         })
 
     @property
     def total_cost(self) -> float:
         """Total estimated cost in arbitrary units."""
-        return sum(
-            c["cost_multiplier"] * (c["estimated_tokens"] / 1000.0)
-            for c in self._calls
-        )
+        return sum(c["cost"] for c in self._calls)
+
+    @property
+    def total_tokens(self) -> int:
+        """Total estimated tokens."""
+        return sum(c["estimated_tokens"] for c in self._calls)
 
     @property
     def total_calls(self) -> int:
@@ -164,15 +173,36 @@ class CostTracker:
             Dict with total_calls, total_cost, models_used, and
             breakdown_by_model.
         """
-        by_model: Dict[str, int] = {}
+        by_model: Dict[str, Dict[str, Any]] = {}
+        by_operation: Dict[str, Any] = {}
         for c in self._calls:
-            by_model[c["model"]] = by_model.get(c["model"], 0) + 1
+            model = c["model"]
+            if model not in by_model:
+                by_model[model] = {"calls": 0, "tokens": 0, "cost": 0.0}
+            by_model[model]["calls"] += 1
+            by_model[model]["tokens"] += c["estimated_tokens"]
+            by_model[model]["cost"] += c["cost"]
+
+            op = c.get("operation", "unknown")
+            if op not in by_operation:
+                by_operation[op] = {"calls": 0, "tokens": 0, "cost": 0.0}
+            by_operation[op]["calls"] += 1
+            by_operation[op]["tokens"] += c["estimated_tokens"]
+            by_operation[op]["cost"] += c["cost"]
 
         return {
             "total_calls": self.total_calls,
+            "total_tokens": self.total_tokens,
             "total_cost": round(self.total_cost, 2),
             "models_used": sorted(self.models_used),
-            "breakdown_by_model": by_model,
+            "breakdown_by_model": {
+                m: {k: round(v, 2) if k == "cost" else v for k, v in d.items()}
+                for m, d in by_model.items()
+            },
+            "breakdown_by_operation": {
+                o: {k: round(v, 2) if k == "cost" else v for k, v in d.items()}
+                for o, d in by_operation.items()
+            },
         }
 
     def reset(self) -> None:
@@ -235,6 +265,7 @@ class ModelRouter:
         task: str,
         mode: str = "lite",
         team: str = "team_a",
+        operation: str = "",
     ) -> Dict[str, Any]:
         """Get the appropriate model configuration for a task.
 
@@ -249,6 +280,7 @@ class ModelRouter:
             task: Task description for complexity estimation.
             mode: Execution mode ('lite', 'hard', 'super').
             team: Team name ('team_a' or 'team_b').
+            operation: Optional operation name for cost tracking.
 
         Returns:
             Dict with keys: model, tier, complexity, max_tokens,
@@ -268,21 +300,26 @@ class ModelRouter:
             complexity, COMPLEXITY_THRESHOLDS["moderate"]
         )
 
+        cost_multiplier = tier["cost_per_1k"]
+
         model_config = {
             "model": tier["models"][0] if tier["models"] else "deepseek-v4-flash",
             "tier": tier_name,
             "tier_description": tier.get("description", ""),
             "complexity": complexity,
             "max_tokens": complexity_config["max_tokens"],
-            "cost_multiplier": tier["cost"],
+            "cost_multiplier": cost_multiplier,
+            "cost_per_1k": cost_multiplier,
             "models": tier["models"],
         }
 
         # Track cost
         self.cost_tracker.record_estimate(
             model=model_config["model"],
-            cost_multiplier=model_config["cost_multiplier"],
+            cost_multiplier=cost_multiplier,
             tokens=model_config["max_tokens"],
+            operation=operation,
+            node_name=f"propose_{team}",
         )
 
         return model_config
@@ -302,13 +339,15 @@ class ModelRouter:
             return {
                 "model": "deepseek-v4-pro",
                 "tier": "ultra",
-                "cost_multiplier": 5,
+                "cost_multiplier": 1.50,
+                "cost_per_1k": 1.50,
                 "complexity": "complex",
             }
         return {
             "model": "deepseek-v4-pro",
             "tier": "pro",
-            "cost_multiplier": 3,
+            "cost_multiplier": 0.50,
+            "cost_per_1k": 0.50,
             "complexity": "moderate",
         }
 
@@ -322,7 +361,8 @@ class ModelRouter:
             "model": "deepseek-v4-pro",
             "tier": "ultra",
             "capability": "research",
-            "cost_multiplier": 5,
+            "cost_multiplier": 1.50,
+            "cost_per_1k": 1.50,
             "complexity": "complex",
             "max_tokens": 8000,
         }

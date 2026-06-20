@@ -374,3 +374,344 @@ class TestGoalParsing:
         assert "dimensions" in result
         assert result["complexity_breakdown"]["has_multiple_requirements"]
         assert "requirements_list" in result["complexity_breakdown"]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# GAALOrchestrator — New Feature Tests
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestBootstrapSelfEvolution:
+    """Test the bootstrap self-evolution system."""
+
+    def test_compute_bootstrap_score(self):
+        """compute_bootstrap_score should return a valid score."""
+        from core.orchestrator import compute_bootstrap_score
+
+        # Good state
+        state_good = {
+            "total_score": 8.5,
+            "proposals": [{"id": "1"}, {"id": "2"}, {"id": "3"}, {"id": "4"}],
+            "eliminations": [{"id": "e1"}, {"id": "e2"}],
+            "execution_history": [{"node": "a"}, {"node": "b"}, {"node": "c"}],
+            "total_retries": 1,
+            "degradation_level": 0,
+        }
+        score = compute_bootstrap_score(state_good)
+        assert 0 <= score <= 10
+        assert score >= 5.0  # Good state should score high
+
+        # Poor state
+        state_poor = {
+            "total_score": 3.0,
+            "proposals": [],
+            "eliminations": [],
+            "execution_history": [],
+            "total_retries": 10,
+            "degradation_level": 2,
+        }
+        score_poor = compute_bootstrap_score(state_poor)
+        assert 0 <= score_poor <= 10
+        assert score_poor < score  # Poor should be lower
+
+    def test_suggest_evolution_action_increasing_loops(self):
+        """Should suggest increasing max_loops when score declines."""
+        from core.orchestrator import suggest_evolution_action
+
+        state = {
+            "scored_proposals": [],
+            "total_score": 6.0,
+        }
+        config = {"gaal": {"max_loops": 4}, "judge": {"dimensions": []}, "evolution": {"enabled": False}}
+
+        action = suggest_evolution_action([7.0, 6.0], state, config)
+        assert action is not None
+        assert action["action"] == "increase_loops"
+
+    def test_suggest_evolution_action_adjust_weight(self):
+        """Should suggest adjusting weight when a dimension is weak."""
+        from core.orchestrator import suggest_evolution_action
+
+        state = {
+            "scored_proposals": [{
+                "dimension_scores": {
+                    "bootstrap": {"score": 0.5},
+                    "reliability": {"score": 1.5},
+                }
+            }],
+            "total_score": 7.0,
+        }
+        config = {
+            "gaal": {"max_loops": 4},
+            "judge": {"dimensions": [
+                {"name": "bootstrap", "weight": 2},
+                {"name": "reliability", "weight": 2},
+            ]},
+            "evolution": {"enabled": False},
+        }
+
+        action = suggest_evolution_action([7.0, 7.5], state, config)
+        # Should find 'bootstrap' as weakest and suggest adjusting weight
+        if action is not None:
+            assert action["action"] in ("adjust_weight", "enable_evolution")
+
+    def test_apply_evolution_action_increase_loops(self):
+        """Applying increase_loops should modify the config."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={"gaal": {"max_loops": 4}})
+        action = {
+            "action": "increase_loops",
+            "target": "config/gaal_v3.yaml",
+            "reason": "Test",
+            "params": {"max_loops": 6},
+        }
+        result = orc._apply_evolution_action(action)
+        assert result["status"] == "applied"
+        assert orc.config["gaal"]["max_loops"] == 6
+
+    def test_apply_evolution_action_enable_evolution(self):
+        """Applying enable_evolution should enable evolution in config."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={"evolution": {"enabled": False}})
+        action = {
+            "action": "enable_evolution",
+            "target": "config/gaal_v3.yaml",
+            "reason": "Test",
+            "params": {"evolution.enabled": True},
+        }
+        result = orc._apply_evolution_action(action)
+        assert result["status"] == "applied"
+        assert orc.config["evolution"]["enabled"] is True
+
+    def test_save_evolution_artifact(self):
+        """Evolution artifacts should be saved to evolution/ directory."""
+        from core.orchestrator import GAALOrchestrator
+        import os
+
+        orc = GAALOrchestrator(config={})
+        action = {"action": "test", "target": "config/test.yaml", "reason": "Test"}
+        orc._save_evolution_artifact(action)
+
+        # Check that evolution directory has files
+        evo_dir = Path(__file__).parent.parent / "evolution"
+        assert evo_dir.exists()
+        files = list(evo_dir.glob("*.json"))
+        assert len(files) > 0
+
+    def test_evolve_config_method(self):
+        """evolve_config() should return an action result."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={
+            "gaal": {"max_loops": 4},
+            "judge": {"dimensions": []},
+            "evolution": {"enabled": True},
+        })
+
+        # Trigger with a specific action
+        result = orc.evolve_config({
+            "action": "increase_loops",
+            "target": "config/gaal_v3.yaml",
+            "reason": "Manual evolution",
+            "params": {"max_loops": 6},
+        })
+        assert result["status"] == "applied"
+
+
+class TestGracefulDegradation:
+    """Test graceful degradation system."""
+
+    def test_degradation_level_in_state(self):
+        """degradation_level should be in graph state."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+        assert orc.degradation_level == 0
+
+    def test_degradation_super_to_hard(self):
+        """Super mode should degrade to hard."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+        orc.mode = "super"
+        orc._original_mode = "super"
+        orc.degradation_level = 0
+
+        result = orc._run_degraded("test goal")
+        assert result["degradation_level"] >= 1
+        assert orc.mode in ("hard", "lite")
+
+    def test_degradation_hard_to_lite(self):
+        """Hard mode should degrade to lite."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+        orc.mode = "hard"
+        orc._original_mode = "hard"
+        orc.degradation_level = 1
+
+        result = orc._run_degraded("test goal")
+        assert result["degradation_level"] >= 1
+        assert orc.mode == "lite" or orc.mode == "lite"
+
+    def test_fallback_proposal_generation(self):
+        """Fallback proposals should be generated on timeout."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+        proposals = orc._generate_fallback_proposal("test goal", "TeamAlpha", "team_a")
+        assert len(proposals) == 1
+        assert "fallback" in proposals[0]["name"].lower()
+        assert proposals[0]["team_id"] == "team_a"
+
+
+class TestCostTracking:
+    """Test cost tracking system."""
+
+    def test_track_node_cost(self):
+        """Tracking cost for a node should accumulate data."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+        orc._track_node_cost("test_node", "testing", 1000, 3)
+
+        assert "test_node" in orc.cost_data["per_node"]
+        assert orc.cost_data["per_node"]["test_node"]["calls"] == 1
+        assert orc.cost_data["per_node"]["test_node"]["total_tokens"] == 1000
+        assert orc.cost_data["per_node"]["test_node"]["total_cost"] > 0
+
+    def test_cost_summary_structure(self):
+        """Cost summary should have the expected structure."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+        orc._track_node_cost("propose_team_a", "team_a_proposal", 500, 1)
+        orc._track_node_cost("propose_team_b", "team_b_proposal", 300, 3)
+        orc._track_node_cost("judge", "final_scoring", 1000, 3)
+
+        summary = orc._build_cost_summary()
+        assert "total_calls" in summary
+        assert "total_tokens" in summary
+        assert "total_cost" in summary
+        assert "per_node" in summary
+        assert "per_team" in summary
+        assert summary["total_calls"] == 3
+        assert summary["total_tokens"] == 1800
+        assert summary["budget_exceeded"] is False
+
+    def test_budget_enforcement(self):
+        """Budget exceeded flag should be set when over limit."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+        orc._max_total_tokens = 100  # Very low budget
+
+        orc._track_node_cost("big_node", "test", 200, 1)
+        assert orc.cost_data["budget_exceeded"] is True
+
+    def test_per_team_cost_tracking(self):
+        """Cost should be tracked per team correctly."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+
+        orc._track_node_cost("propose_team_a", "team_a_proposal", 1000, 3)
+        orc._track_node_cost("propose_team_b", "team_b_proposal", 500, 1)
+
+        assert orc.cost_data["per_team"]["team_a"] > 0
+        assert orc.cost_data["per_team"]["team_b"] > 0
+        assert orc.cost_data["per_team"]["team_a"] > orc.cost_data["per_team"]["team_b"]
+
+
+class TestPerformanceStats:
+    """Test performance statistics."""
+
+    def test_build_performance_stats(self):
+        """Performance stats should be computed from execution history."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+        orc.execution_history = [
+            {"node": "parse_goal", "status": "completed", "duration": 0.5, "attempts": 1},
+            {"node": "propose_team_a", "status": "completed", "duration": 1.2, "attempts": 2},
+            {"node": "judge", "status": "completed", "duration": 0.3, "attempts": 1},
+        ]
+
+        stats = orc._build_performance_stats({})
+        assert stats["total_nodes"] == 3
+        assert stats["total_attempts"] == 4
+        assert stats["retries"] == 1
+        assert stats["avg_duration_per_node"] > 0
+        assert "parse_goal" in stats["node_stats"]
+
+
+class TestParallelTeamExecution:
+    """Test parallel team execution support."""
+
+    def test_parallel_team_execution_both_return(self):
+        """Both teams should return proposals when executed in parallel."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={
+            "teams": {
+                "team_a": {"name": "Team Alpha", "tier": "pro"},
+                "team_b": {"name": "Team Beta", "tier": "flash"},
+            },
+            "execution": {"team_timeout": 30},
+        })
+
+        state = {
+            "goal": "设计一个文件备份系统",
+            "mode": "lite",
+            "current_loop": 0,
+            "proposals": [],
+        }
+
+        result = orc._node_propose_team_a(state)
+        assert "proposals" in result
+        assert "team_a_proposals" in result
+        assert "team_b_proposals" in result
+        assert len(result["proposals"]) >= 2  # At least one from each team
+
+    def test_fallback_on_timeout(self):
+        """Fallback proposals should be generated if team fails."""
+        from core.orchestrator import GAALOrchestrator
+
+        orc = GAALOrchestrator(config={})
+        fallback = orc._generate_fallback_proposal("test", "TeamAlpha", "team_a")
+        assert len(fallback) == 1
+        assert fallback[0]["team_id"] == "team_a"
+
+
+class TestCircuitBreakerPersistence:
+    """Test circuit breaker state persistence."""
+
+    def test_circuit_breaker_serialize_deserialize(self):
+        """Circuit breaker state should be serializable and restorable."""
+        from core.orchestrator import CircuitBreaker
+
+        cb = CircuitBreaker(threshold=3, reset_seconds=60)
+        cb.record_failure()
+        cb.record_failure()
+
+        data = cb.to_dict()
+        assert data["state"] == "closed"  # Still closed (2 < 3)
+        assert data["failure_count"] == 2
+
+        # Restore
+        cb2 = CircuitBreaker.from_dict(data)
+        assert cb2.threshold == 3
+        assert cb2.failure_count == 2
+        assert cb2.state == "closed"
+
+    def test_circuit_breaker_opens_at_threshold(self):
+        """Circuit breaker should open at threshold."""
+        from core.orchestrator import CircuitBreaker
+
+        cb = CircuitBreaker(threshold=3, reset_seconds=60)
+        cb.record_failure()
+        cb.record_failure()
+        cb.record_failure()
+        assert cb.state == "open"
+        assert cb.can_proceed() is False

@@ -9,6 +9,9 @@ Generates structured arena reports with:
 [A] Achievement Scores
 [W] Next Steps / Suggestions
 [H] Historical Trend (optional)
+[C] Cost Summary
+[E] Evolution Suggestions
+[P] Performance Stats
 
 Uses the report_v3.md.j2 Jinja2 template.
 """
@@ -32,7 +35,8 @@ class ReportGenerator:
     """Generates structured GAAL v3 arena reports using Jinja2 templates.
 
     Produces reports in the [T][M][V][I][A][W] format with optional
-    [H] historical trend data.
+    [H] historical trend data, [C] cost summary, [E] evolution suggestions,
+    and [P] performance stats.
 
     Attributes:
         template_dir: Directory containing the Jinja2 template.
@@ -84,6 +88,13 @@ class ReportGenerator:
         architecture_diagram: str = "",
         session_id: str = "",
         historical_trend: Optional[List[Dict[str, Any]]] = None,
+        # New enriched data
+        cost_summary: Optional[Dict[str, Any]] = None,
+        degradation_history: Optional[List[Dict[str, Any]]] = None,
+        evolution_suggestions: Optional[List[Dict[str, Any]]] = None,
+        performance_stats: Optional[Dict[str, Any]] = None,
+        bootstrap_score: float = 0.0,
+        degradation_level: int = 0,
         **kwargs: Any,
     ) -> str:
         """Generate a full GAAL v3 arena report from template.
@@ -101,6 +112,12 @@ class ReportGenerator:
             architecture_diagram: ASCII architecture diagram.
             session_id: Unique session identifier.
             historical_trend: Optional trend data across rounds.
+            cost_summary: Optional cost tracking summary.
+            degradation_history: Optional degradation events.
+            evolution_suggestions: Optional evolution action history.
+            performance_stats: Optional performance statistics.
+            bootstrap_score: Bootstrap/self-evolution score.
+            degradation_level: Current degradation level.
             **kwargs: Additional template variables.
 
         Returns:
@@ -144,6 +161,16 @@ class ReportGenerator:
                 "reason": e.get("reason", ""),
             })
 
+        # Default values for new fields
+        if cost_summary is None:
+            cost_summary = {}
+        if degradation_history is None:
+            degradation_history = []
+        if evolution_suggestions is None:
+            evolution_suggestions = []
+        if performance_stats is None:
+            performance_stats = {}
+
         # Render template
         report = template.render(
             goal=goal or "未设置",
@@ -159,6 +186,13 @@ class ReportGenerator:
             suggestions=suggestions or {},
             architecture_diagram=architecture_diagram or "(未提供架构图)",
             historical_trend=historical_trend or [],
+            # New enriched fields
+            cost_summary=cost_summary,
+            degradation_history=degradation_history,
+            evolution_suggestions=evolution_suggestions,
+            performance_stats=performance_stats,
+            bootstrap_score=bootstrap_score,
+            degradation_level=degradation_level,
             **kwargs,
         )
 

@@ -58,8 +58,19 @@ retry:
   max_delay_seconds: 120
 
 evolution:
-  enabled: false
+  enabled: true  # Self-evolution enabled by default
   max_iterations: 3
   config_paths:
     - "config/gaal_v3.yaml"
     - "config/scorecard.yaml"
+
+# Cost tracking configuration
+cost:
+  max_tokens_per_node: 4000
+  max_total_tokens: 50000
+  budget_enforcement: true
+
+# Execution configuration
+execution:
+  team_timeout: 30  # seconds per team for parallel execution
+  max_parallel_teams: 2
