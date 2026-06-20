@@ -447,27 +447,26 @@ class GAALOrchestrator:
     def _node_propose_team_a(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """PROPOSE_TEAM_A node: Generate proposals from Team A.
 
-        Uses TeamAgent for Team A (higher-tier model).
+        Uses TeamAgent execute() to generate deep/quality proposals.
         """
         goal = state.get("goal", "")
         mode = state.get("mode", "lite")
-        max_proposals = state.get("max_proposals", 2)
         current_loop = state.get("current_loop", 0)
 
         team_config = self.config.get("teams", {}).get("team_a", {})
-        agent = TeamAgent(name="TeamAlpha", config=self.config)
+        agent = TeamAgent(
+            name="TeamAlpha",
+            context=AgentContext(
+                goal=goal,
+                mode=mode,
+                round_num=current_loop,
+            ),
+            config=self.config,
+        )
         agent.configure("team_a", team_config)
 
-        proposals = []
-        for i in range(max_proposals):
-            proposal = agent.add_proposal(
-                name=f"Team A - 方案 {current_loop * max_proposals + i + 1}",
-                description=(
-                    f"来自 Team A 的第 {i+1} 个方案 (Loop {current_loop + 1}). "
-                    f"目标: {goal[:50]}"
-                ),
-            )
-            proposals.append(proposal)
+        # Use execute() to generate intelligent proposals
+        proposals = agent.execute(goal=goal)
 
         state["proposals"] = state.get("proposals", []) + proposals
         state["team_a_proposals"] = proposals
@@ -480,27 +479,26 @@ class GAALOrchestrator:
     def _node_propose_team_b(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """PROPOSE_TEAM_B node: Generate proposals from Team B.
 
-        Uses TeamAgent for Team B (lower-tier model for diversity).
+        Uses TeamAgent execute() to generate creative/diverse proposals.
         """
         goal = state.get("goal", "")
-        max_proposals = state.get("max_proposals", 2)
+        mode = state.get("mode", "lite")
         current_loop = state.get("current_loop", 0)
 
         team_config = self.config.get("teams", {}).get("team_b", {})
-        agent = TeamAgent(name="TeamBeta", config=self.config)
+        agent = TeamAgent(
+            name="TeamBeta",
+            context=AgentContext(
+                goal=goal,
+                mode=mode,
+                round_num=current_loop,
+            ),
+            config=self.config,
+        )
         agent.configure("team_b", team_config)
 
-        proposals = []
-        for i in range(max_proposals):
-            offset = len(state.get("proposals", []))
-            proposal = agent.add_proposal(
-                name=f"Team B - 方案 {offset + i + 1}",
-                description=(
-                    f"来自 Team B 的第 {i+1} 个方案 (Loop {current_loop + 1}). "
-                    f"目标: {goal[:50]}"
-                ),
-            )
-            proposals.append(proposal)
+        # Use execute() to generate intelligent proposals
+        proposals = agent.execute(goal=goal)
 
         state["proposals"] = state.get("proposals", []) + proposals
         state["team_b_proposals"] = proposals
@@ -606,6 +604,22 @@ class GAALOrchestrator:
             for j in range(i + 1, len(survivors)):
                 a, b = survivors[i], survivors[j]
                 diff = a.get("total_score", 0) - b.get("total_score", 0)
+
+                # Build dimension-level breakdown
+                a_dims = a.get("dimension_scores", {})
+                b_dims = b.get("dimension_scores", {})
+                dim_breakdown = {}
+                for dim_name in set(list(a_dims.keys()) + list(b_dims.keys())):
+                    a_score = a_dims.get(dim_name, {}).get("score", 0)
+                    b_score = b_dims.get(dim_name, {}).get("score", 0)
+                    dim_breakdown[dim_name] = {
+                        "a_score": a_score,
+                        "b_score": b_score,
+                        "winner": a.get("name") if a_score > b_score else (
+                            b.get("name") if b_score > a_score else "tie"
+                        ),
+                    }
+
                 comparisons.append({
                     "proposal_a": a.get("name"),
                     "proposal_b": b.get("name"),
@@ -613,6 +627,7 @@ class GAALOrchestrator:
                     "score_b": b.get("total_score"),
                     "difference": round(abs(diff), 2),
                     "winner": a.get("name") if diff > 0 else b.get("name"),
+                    "dimension_breakdown": dim_breakdown,
                 })
 
         winner = max(survivors, key=lambda p: p.get("total_score", 0))

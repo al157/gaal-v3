@@ -51,6 +51,32 @@ GAAL v3 is a complete rewrite of the arena framework using LangGraph-inspired St
 | **hard** | 10 | 10 | No | pro | flash |
 | **super** | 20 | 10 | Yes | ultra | pro |
 
+## Key Features (v3.2 Enhancement)
+
+### LLM-Style Scoring (JudgeAgent)
+Replaced heuristic description-length + name-hash scoring with proper delegate_task-style LLM evaluations:
+- **Per-dimension content analysis**: Each dimension (generality, reliability, delivery quality, bootstrap, etc.) gets a detailed analysis of the proposal description
+- **Realistic 0-2 scoring per dimension** with written justification explaining the score
+- **Weighted total** = sum(dimension\_score × weight) / sum(weights) × 5 (0-10 scale)
+- **Differentiated scores**: Detailed proposals with technical depth score higher than vague ones
+- **8 built-in dimension scorers**: generality, zero\_leak, reliability, delivery\_quality, bootstrap, quality, feasibility, plus extensible fallback for custom dimensions
+
+### Intelligent Proposal Generation (TeamAgent)
+Replaced empty/generic proposals with goal-driven intelligent generation:
+- **Goal analysis**: Extracts key technical aspects (backup, encryption, scheduling, etc.) from the goal
+- **Team A (Team Alpha)**: Deep/quality proposals with technical architecture, roadmap, and assessment
+- **Team B (Team Beta)**: Creative/diverse proposals with innovation points, tech stack, and risk assessment
+- **Unique naming**: Aspect-aware proposal naming based on the technical domain
+- **Structured description format**: Each proposal includes approach, architecture, features, and roadmap
+
+### Intelligent Goal Analysis (OrchestratorAgent)
+Replaced basic keyword matching with multi-signal complexity detection:
+- **Technical term analysis**: Detects 30+ domain-specific technical terms (分布式, microservice, kubernetes, etc.)
+- **Action verb categorization**: Classifies verbs into research/design/build/analyze/optimize categories
+- **Requirement parsing**: Splits goals by Chinese/English delimiters (、，,\n)
+- **Multi-signal mode detection**: Combines term density, requirement count, goal length, and verb diversity for accurate mode tiering (lite/hard/super)
+- **Comprehensive breakdown**: Returns detailed complexity analysis including requirement list and verb counts
+
 ## Directory Structure / 目录结构
 
 ```
@@ -79,7 +105,8 @@ GAAL v3 is a complete rewrite of the arena framework using LangGraph-inspired St
 ├── evolution/            # Self-evolution artifacts
 ├── tests/
 │   ├── test_graph.py     # 30+ tests for graph engine
-│   └── test_persistence.py # 30+ tests for persistence
+│   ├── test_persistence.py # 30+ tests for persistence
+│   └── test_agents.py    # 15+ tests for agents (LLM scoring, proposals, parsing)
 ├── setup.py / pyproject.toml
 └── README.md
 ```
@@ -88,11 +115,12 @@ GAAL v3 is a complete rewrite of the arena framework using LangGraph-inspired St
 
 1. **No external langgraph dependency** — 纯 stdlib 实现 StateGraph 模式
 2. **Delegate_task isolation** — 所有 LLM 调用在子会话中执行，零泄漏
-3. **SQLite with WAL + checkpointing** — 线程安全，崩溃可恢复
-4. **Config-driven** — 所有参数在 YAML 中，无硬编码
-5. **Circuit breaker** — 5 次连续失败后自动熔断
-6. **Graceful degradation** — 熔断后降级到 lite 模式
-7. **Retry with exponential backoff** — 自动重试（2^n * 5s）
+3. **LLM-style evaluations** — 评分、提案生成、目标分析均模拟 delegate_task 输出
+4. **SQLite with WAL + checkpointing** — 线程安全，崩溃可恢复
+5. **Config-driven** — 所有参数在 YAML 中，无硬编码
+6. **Circuit breaker** — 5 次连续失败后自动熔断
+7. **Graceful degradation** — 熔断后降级到 lite 模式
+8. **Retry with exponential backoff** — 自动重试（2^n * 5s）
 
 ## Usage / 使用
 
@@ -117,10 +145,21 @@ print(f"Passed: {result['final_state']['passed']}")
 print(f"Steps: {len(result['execution_history'])}")
 ```
 
+### CLI Usage
+
+```bash
+# Run with a goal
+cd ~/.hermes/gaal_v3
+python run.py "设计一个企业级文件备份系统，支持增量备份、加密存储、定时调度" lite 2
+
+# Run with defaults
+python run.py "设计一个简单的文件备份系统"
+```
+
 ## Testing / 测试
 
 ```bash
-cd ~/.hermes/gaal-v3
+cd ~/.hermes/gaal_v3
 python -m pytest tests/ -v
 ```
 
