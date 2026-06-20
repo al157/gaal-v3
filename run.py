@@ -9,7 +9,8 @@ sys.path.insert(0, str(ROOT))
 from core.orchestrator import GAALOrchestrator
 
 
-def run_arena(goal: str, mode: str = "lite", max_loops: int = 4, config_path: str = None):
+def run_arena(goal: str, mode: str = "lite", max_loops: int = 4,
+              config_path: str = None):
     """Run a GAAL v3 arena with the given goal.
     
     Args:
@@ -42,10 +43,15 @@ if __name__ == "__main__":
     
     result = run_arena(goal=goal, mode=mode)
     
-    print(f"\nExecution: {len(result.get('history', []))} nodes completed")
-    print(f"Score: {result.get('final_score', 'N/A')} / 10")
-    print(f"Passed: {result.get('passed', False)}")
-    print(f"Loops: {result.get('loops_completed', 0)} / {result.get('max_loops', 4)}")
-    print(f"Proposals: {result.get('total_proposals', 0)}")
-    print(f"Eliminations: {len(result.get('eliminations', []))}")
-    print(f"Winner: {result.get('winner', 'N/A')}")
+    hist = result.get("execution_history", [])
+    state = result.get("final_state", {})
+    
+    print(f"\nStatus: {result.get('status', '?')}")
+    print(f"Nodes executed: {len(hist)}")
+    for h in hist:
+        print(f"  [{h['status']:>9}] {h['node']:<16} ({h['duration']:.4f}s)")
+    print(f"\nScore: {state.get('total_score', 'N/A')} / 10")
+    print(f"Passed: {state.get('total_score', 0) >= state.get('pass_threshold', 8.5)}")
+    print(f"Loops: {state.get('current_loop', 0)} / {state.get('max_loops', 4)}")
+    print(f"Proposals: {len(state.get('proposals', []))}")
+    print(f"Winner: {state.get('winner_name', 'N/A')}")
