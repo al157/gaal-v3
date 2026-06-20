@@ -26,9 +26,10 @@ from typing import Any, Dict, List, Optional, Tuple, Callable
 from .graph import StateGraph, CompiledGraph, _serializable_state, _format_execution_history
 from .persistence import CheckpointStore
 from .model_router import ModelRouter
-from ..agents.orchestrator_agent import OrchestratorAgent
-from ..agents.team_agent import TeamAgent
-from ..agents.judge_agent import JudgeAgent
+from agents.orchestrator_agent import OrchestratorAgent
+from agents.team_agent import TeamAgent
+from agents.judge_agent import JudgeAgent
+from agents.base import AgentContext
 
 logger = logging.getLogger(__name__)
 
@@ -318,15 +319,17 @@ class GAALOrchestrator:
     def _route_from_parse(self, state: Dict[str, Any]) -> str:
         """Route from parse_goal node.
 
-        - 'end' if goal is simple enough
+        - 'end' only if goal is truly trivial (empty or single word)
         - 'research' if super mode
-        - 'propose' otherwise
+        - 'propose' otherwise (most tasks — even "simple" ones)
         """
         mode = state.get("mode", "lite")
+        goal = state.get("goal", "").strip()
         is_simple = state.get("is_simple", False)
 
-        if is_simple:
-            logger.info("Goal is simple, routing to end")
+        # Only END for truly trivial queries: empty goal or very short (< 10 chars)
+        if not goal or (is_simple and len(goal) < 10):
+            logger.info("Goal is trivial, routing to end")
             return "end"
         if mode == "super":
             logger.info("Super mode, routing to research")
@@ -390,7 +393,7 @@ class GAALOrchestrator:
         goal = state.get("goal", self.goal)
         orchestrator = OrchestratorAgent(
             name="Orchestrator",
-            context=None,
+            context=AgentContext(goal=goal, mode=self.mode),
             config=self.config,
         )
 
