@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="gaal-v3",
+    name="gaal_v3",
     version="3.0.0",
     description="GAAL v3 — LangGraph-inspired StateGraph Arena Framework",
     packages=find_packages(include=["gaal_v3*"]),
@@ -12,5 +12,10 @@ setup(
     ],
     extras_require={
         "test": ["pytest>=7.0"],
+    },
+    entry_points={
+        "console_scripts": [
+            "gaal-arena=gaal_v3.run:main",
+        ],
     },
 )
